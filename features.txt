@@ -1,0 +1,15 @@
+#TAGS coming to your events!
+Copy to my calendar and add new school event in one click
+Synopsis icons in event title
+Itemized event synopsis
+Address speed dial and internationalization
+Use Google Calendar
+Events can only be deleted by its owner (and calendar admin, of course)
+Use mobile and web apps of great usability
+Integrate with personal schedule
+Navigate with Google Maps
+Save development time
+Focus on quantity and brevity of event info
+Zero cost on server and domain name
+
+Solve event-goers’ problem with the most efficient use of limited development and maintenance capability (use Google products of great usability rather than develop web or mobile app)
