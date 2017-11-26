@@ -1,0 +1,222 @@
+/**
+ * PUBLISH SCHOOL CALENDAR
+ *   In Google Calendar
+ *   Go to My calendars section in the left panel
+ *   Find the first calendar
+ *   Click the down arrow button
+ *   Click Share this calendar
+ *   Check Make this calendar public
+ *   Check Save
+ 
+ * INSTALL TRIGGER
+ *   Go to Toolbar/Current project's triggers
+ *   Click No triggers set up. Click here to add one now
+ *   Select Run: newEvent
+ *   Select Events: FromForm, OnFormSubmit
+ *   Click Save
+ *
+ * DEPLOY WEB APP
+ *   Go to Menu/Publish/Deploy as web app...
+ *   Select Project version: New
+ *   Select Execute the app as: User accessing the web app
+ *   Select Who has access to the app: anyone
+ *
+ * ENABLE CALENDAR API
+ *   In Script editor
+ *   Go to Menu/Resources/Advanced Google Services...
+ *   Turn on Calendar API
+ *   Go to Google API Console
+ *   Click Library in the left panel
+ *   Click Calendar API in G Suite APIs category
+ *   ENABLE Google Calendar API
+ *
+ * MAKE HALF-DONE EVENTS CALENDAR
+ *   In Google Calendar
+ *   Find My calendars section in the left panel 
+ *   Click the down arrow button
+ *   Click Create new calendar
+ *   Set Calendar Name: Half-done events
+ *   Check Make this calendar public
+ *
+ * SET PARAMETERS
+ *   In Google Calendar
+ *   Find My calendars" section in the left panel
+ *   Find Half-done events
+ *   Click the down arrow button
+ *   Click Calendar settings
+ *   Get Calendar ID of Half-done events calendar in Calendar Address section
+ *
+ *   In scool calendar form edit
+ *   Click ... (More) button at the top right
+ *   Click get pre-filled link
+ *   Fill in Calendar ID: HELLO
+ *   Submit the form
+ *   Get the part of pre-filled link before HELLO
+ *
+ *   In Script editor
+ *   Go to Menu/File/Project properties
+ *   Go to Script properties tab
+ *   Change PREFILLED_LINK to the part of pre-filled link before HELLO
+ *   Change HALF_DONE_EVENTS_CALENDAR_ID to Calendar ID of Half-done events calendar
+ *
+ * QUESTION GUIDELINES
+ *   Title only contains an icon
+ *   Description's trailing space character suppresses the icon in event title
+ *   Type Paragraph generates an item for each line
+ *   Tag has icon #
+ *   Calendar ID is required
+ *
+ * DISALLOW SUBMIT ANOTHER RESPONSE (Submit another response does not pre-fill Calendar ID)
+ *   In scool calendar form edit
+ *   Click Settings button at the top right
+ *   Go to PRESENTATION tab
+ *   Uncheck Show link to submit another response
+ */
+
+function newEvent() {
+  var icons = '';
+  var desc = '';
+  var form = FormApp.getActiveForm();
+  var formResponses = form.getResponses();
+  var formResponse = formResponses[formResponses.length - 1];
+  var itemResponses = formResponse.getItemResponses();
+  for (var i = 1; i < itemResponses.length; i++) {
+    var itemResponse = itemResponses[i];
+    var item = itemResponse.getItem();
+    
+    var eyecatchcon = item.getHelpText().slice(-1);
+    if (eyecatchcon == ' ') //synopsis icon is empty
+      var add = false;
+    else
+      var add = true;
+    var icon = item.getTitle();
+    
+    var itemType = item.getType();
+    const paragraphType = FormApp.ItemType.PARAGRAPH_TEXT;
+    var answers = itemResponse.getResponse();
+    if (itemType == paragraphType)
+      answers = answers.split(/\r?\n/); //generate an item for each line
+    if (icon == '#') { //question is Tag
+      for (var k in answers) {
+        if (answers[k].charAt(0) == '#') //trim # at the beginning of a tag
+          answers[k] = answers[k].slice(1);
+        answers[k] = '<a href="https://calendar.google.com/calendar/r/search?q=%23' + answers[k] + '">#' + answers[k] + '</a>'; //click a tag shows all events having that tag
+      }
+      answers = [answers.join(' ')]; //join tags into one line
+      icon = '';
+    }
+    if (icon == '🎫' || '🔗') { //question is Registration or Original post
+      for (var k in answers) {
+        answers[k] = answers[k].replace(/^\s*(http:\/\/|https:\/\/)/,'');
+        answers[k] = answers[k].replace(/^\s*(facebook|www.facebook)/,'fb');
+        answers[k] = answers[k].replace(/(\?type\=3|\?type\=3&theater)\s*$/,'');
+      }
+    }
+    
+    for (var j in answers) {
+      var answer = answers[j]; //answer is a line of multiline answers
+      if (answer) {
+        answer = icon + answer;
+        desc += answer + '\n';
+        if (add) {
+          icons += icon;
+          add = false;
+        }
+      }
+    }
+  }
+  
+  var posterCalId = itemResponses[0].getResponse();
+  var eventTitle = posterCalId;
+  if (icons == '')
+    eventTitle += "'s next coolest event";
+  else
+    eventTitle += "'s next coolest event " + icons;
+  var scriptProperties = PropertiesService.getScriptProperties();
+  var halfdoneCalId = scriptProperties.getProperty('HALF_DONE_EVENTS_CALENDAR_ID');
+  var halfdoneCal = CalendarApp.getCalendarById(halfdoneCalId);
+  var event = halfdoneCal.createEvent(eventTitle, new Date(), new Date());
+  var eventId = event.getId().slice(0,-11); //event.getId()='jll2e6ubm9v409fmhngoilv0s@gmail.com' use slice to remove '@gmail.com'
+  var scoolCalId = CalendarApp.getId();
+  var moveEventBtn = '<a href="' + ScriptApp.getService().getUrl() + '?r=move_event&pId=' + posterCalId + '&sId=' + scoolCalId + '&eId=' + eventId + '" target="_blank">GIMME MY COOL EVENT, I\'LL FINISH</a>';
+  
+  desc += moveEventBtn;
+  event.setDescription(desc);
+  event.addGuest(scoolCalId);
+
+  if (posterCalId == scoolCalId) {
+    var acl = {
+      "scope": {
+        "type": "user",
+        "value": posterCalId
+      },
+      "role": 'writer'
+    };
+    var createdRule = Calendar.Acl.insert(acl, halfdoneCalId);
+  }
+}
+
+function doGet(e) {
+  var param = e.parameter;
+  var posterCalId = param.pId;
+  var scoolCalId = param.sId;
+  var eventId = param.eId;
+  var request = param.r;
+  var usrCalId = CalendarApp.getId();
+  var scriptProperties = PropertiesService.getScriptProperties();
+  var halfdoneCalId = scriptProperties.getProperty('HALF_DONE_EVENTS_CALENDAR_ID');
+  switch (request) {
+    case 'move_event':
+      if (usrCalId != posterCalId)
+        return ContentService.createTextOutput('ONLY ' + posterCalId + ' GETS IT. TOO BAD!');
+      Calendar.Events.move(halfdoneCalId, eventId, usrCalId);
+      var movedEvent = CalendarApp.getEventSeriesById(eventId);
+      
+      var eventTitle = movedEvent.getTitle();
+      eventTitle = eventTitle.slice(posterCalId.length + 21);
+      movedEvent.setTitle(eventTitle);
+      
+      var desc = movedEvent.getDescription();
+      desc = desc.substring(0, desc.lastIndexOf("\n") + 1); //remove moveEventBtn
+      var copyEventBtn = '<a href="' + ScriptApp.getService().getUrl() + '?r=copy_event&pId=' + posterCalId + '&sId=' + scoolCalId + '&eId=' + eventId + '" target="_blank">Copy to my calendar</a>';
+      var newEventBtn = '<a href="' + ScriptApp.getService().getUrl() + '?r=new_event" target="_blank">New school event</a>';
+      desc += copyEventBtn + ' ' + newEventBtn;
+      movedEvent.setDescription(desc);
+      
+      return ContentService.createTextOutput('HERE YOU GO!');
+      break;
+    case 'new_event':
+      var prefilledLink = scriptProperties.getProperty('PREFILLED_LINK');
+      return HtmlService.createHtmlOutput('<script>window.location.replace("' + prefilledLink + usrCalId + '");</script>');
+      break;
+    case 'copy_event':
+      if (usrCalId == posterCalId) { //duplicate event in my calendar
+        var postedEvent = Calendar.Events.get(usrCalId, eventId);
+        var initEvent = {
+          'start': postedEvent.start,
+          'end': postedEvent.end
+        };
+        var duplicatedEvent = Calendar.Events.insert(initEvent,usrCalId);
+        for (var i in postedEvent) {
+          if ( i != 'id' && i!= 'iCalUID' ) {
+            duplicatedEvent[i] = postedEvent[i];
+          }
+        }
+        duplicatedEvent.description = duplicatedEvent.description.replace(eventId, duplicatedEvent.id);
+        Calendar.Events.update(duplicatedEvent, usrCalId, duplicatedEvent.id);
+        return ContentService.createTextOutput('SUCCESS!');
+      }
+      try { //copy event from scool calendar to my calendar
+        var deletedEvent = Calendar.Events.get(usrCalId, eventId);
+      }
+      catch(err) { //event yet copied
+        var scoolEvent = Calendar.Events.get(scoolCalId, eventId);
+        var copiedEvent = Calendar.Events.insert(scoolEvent, usrCalId);
+        return ContentService.createTextOutput('SUCCESS!');
+      }
+      deletedEvent.status = 'confirmed'; //event copied but deleted
+      Calendar.Events.update(deletedEvent, usrCalId, eventId);
+      return ContentService.createTextOutput('SUCCESS!');
+      break;
+  }
+}
